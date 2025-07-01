@@ -8,6 +8,7 @@ import minimatch from "minimatch";
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
+const CUSTOM_RULES_PATH: string = core.getInput("custom_rules_path");
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -58,14 +59,15 @@ async function getDiff(
 
 async function analyzeCode(
   parsedDiff: File[],
-  prDetails: PRDetails
+  prDetails: PRDetails,
+  customRules: string | null
 ): Promise<Array<{ body: string; path: string; line: number }>> {
   const comments: Array<{ body: string; path: string; line: number }> = [];
 
   for (const file of parsedDiff) {
     if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
-      const prompt = createPrompt(file, chunk, prDetails);
+      const prompt = createPrompt(file, chunk, prDetails, customRules);
       const aiResponse = await getAIResponse(prompt);
       if (aiResponse) {
         const newComments = createComment(file, chunk, aiResponse);
@@ -78,14 +80,23 @@ async function analyzeCode(
   return comments;
 }
 
-function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
-  return `Your task is to review pull requests. Instructions:
+function createPrompt(
+  file: File,
+  chunk: Chunk,
+  prDetails: PRDetails,
+  customRules: string | null
+): string {
+  const defaultRules = `Your task is to review pull requests. Instructions:
 - Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
 - Use the given description only for the overall context and only comment the code.
-- IMPORTANT: NEVER suggest adding comments to the code.
+- IMPORTANT: NEVER suggest adding comments to the code.`;
+
+  const rules = customRules || defaultRules;
+
+  return `${rules}
 
 Review the following code diff in the file "${
     file.to
@@ -102,11 +113,10 @@ Git diff to review:
 
 \`\`\`diff
 ${chunk.content}
-${chunk.changes
+${
   // @ts-expect-error - ln and ln2 exists where needed
-  .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-  .join("\n")}
-\`\`\`
+  chunk.changes.map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`).join("\n")
+}\`\`\`
 `;
 }
 
@@ -232,7 +242,16 @@ async function main() {
     );
   });
 
-  const comments = await analyzeCode(filteredDiff, prDetails);
+  let customRules: string | null = null;
+  if (CUSTOM_RULES_PATH) {
+    try {
+      customRules = readFileSync(CUSTOM_RULES_PATH, "utf8");
+    } catch (error) {
+      core.warning(`Could not read custom rules file at ${CUSTOM_RULES_PATH}. Using default rules.`);
+    }
+  }
+
+  const comments = await analyzeCode(filteredDiff, prDetails, customRules);
   if (comments.length > 0) {
     await createReviewComment(
       prDetails.owner,

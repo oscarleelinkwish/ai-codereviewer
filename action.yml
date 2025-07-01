@@ -15,6 +15,9 @@ inputs:
     description: "Glob patterns to exclude files from the diff analysis"
     required: false
     default: ""
+  custom_rules_path:
+    description: "Path to a file with custom review rules."
+    required: false
 runs:
   using: "node16"
   main: "dist/index.js"
