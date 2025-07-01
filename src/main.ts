@@ -7,7 +7,7 @@ import minimatch from "minimatch";
 
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
-const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
+const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL") || 'gpt-4';
 const CUSTOM_RULES_PATH: string = core.getInput("custom_rules_path");
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
@@ -194,19 +194,25 @@ async function createReviewComment(
 }
 
 async function main() {
+  core.info('[AI_REVIEW_DEBUG] Starting AI Code Reviewer');
+  
   const prDetails = await getPRDetails();
   let diff: string | null;
   const eventData = JSON.parse(
     readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
   );
 
+  core.info(`[AI_REVIEW_DEBUG] Event: ${eventData.action}`);
+
   if (eventData.action === "opened") {
+    core.info('[AI_REVIEW_DEBUG] Getting diff for opened PR');
     diff = await getDiff(
       prDetails.owner,
       prDetails.repo,
       prDetails.pull_number
     );
   } else if (eventData.action === "synchronize") {
+    core.info('[AI_REVIEW_DEBUG] Getting diff for synchronized PR');
     const newBaseSha = eventData.before;
     const newHeadSha = eventData.after;
 
@@ -222,38 +228,54 @@ async function main() {
 
     diff = String(response.data);
   } else {
-    console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
+    core.info(`[AI_REVIEW_DEBUG] Unsupported event: ${process.env.GITHUB_EVENT_NAME}`);
+    return;
+  }
+  
+  if (!diff) {
+    core.info('[AI_REVIEW_DEBUG] No diff found');
     return;
   }
 
-  if (!diff) {
-    console.log("No diff found");
-    return;
-  }
+  core.info(`[AI_REVIEW_DEBUG] Diff length: ${diff.length} characters`);
 
   const parsedDiff = parseDiff(diff);
-
+  
   const excludePatterns = core
     .getInput("exclude")
     .split(",")
     .map((s) => s.trim());
+
+  core.info(`[AI_REVIEW_DEBUG] Exclude patterns: ${excludePatterns.join(', ')}`);
 
   const filteredDiff = parsedDiff.filter((file) => {
     return !excludePatterns.some((pattern) =>
       minimatch(file.to ?? "", pattern)
     );
   });
+  
+  core.info(`[AI_REVIEW_DEBUG] Files before filtering: ${parsedDiff.length}, after filtering: ${filteredDiff.length}`);
+  
+  if (filteredDiff.length === 0) {
+    core.info('[AI_REVIEW_DEBUG] All files filtered out. No code to review.');
+    return;
+  }
 
   let customRules: string | null = null;
   if (CUSTOM_RULES_PATH) {
     try {
       customRules = readFileSync(CUSTOM_RULES_PATH, "utf8");
+      core.info('[AI_REVIEW_DEBUG] Custom rules loaded successfully');
     } catch (error) {
       core.warning(`Could not read custom rules file at ${CUSTOM_RULES_PATH}. Using default rules.`);
     }
   }
-
+  
+  core.info('[AI_REVIEW_DEBUG] Starting code analysis...');
   const comments = await analyzeCode(filteredDiff, prDetails, customRules);
+  
+  core.info(`[AI_REVIEW_DEBUG] Analysis complete. Found ${comments.length} comments`);
+  
   if (comments.length > 0) {
     await createReviewComment(
       prDetails.owner,
@@ -261,6 +283,7 @@ async function main() {
       prDetails.pull_number,
       comments
     );
+    core.info('[AI_REVIEW_DEBUG] Review posted successfully');
   }
 }
 
