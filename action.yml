@@ -19,8 +19,10 @@ inputs:
     description: "Path to a file with custom review rules."
     required: false
 runs:
-  using: "node16"
-  main: "dist/index.js"
+  using: 'composite'
+  steps:
+    - run: node ${{ github.action_path }}/lib/main.js
+      shell: bash
 branding:
   icon: "aperture"
   color: "green"
