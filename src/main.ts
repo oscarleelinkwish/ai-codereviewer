@@ -135,6 +135,7 @@ async function getAIResponse(prompt: string): Promise<Array<{
   };
 
   try {
+    core.info(`[AI_REVIEW_DEBUG] Prompt sent to OpenAI: ${prompt}`);
     const response = await openai.chat.completions.create({
       ...queryConfig,
       // return JSON if the model supports it:
