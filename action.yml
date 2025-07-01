@@ -24,6 +24,7 @@ runs:
     - name: Install Dependencies
       run: npm install
       shell: bash
+      working-directory: ${{ github.action_path }}
     - name: Run Reviewer
       run: node ${{ github.action_path }}/lib/main.js
       shell: bash
