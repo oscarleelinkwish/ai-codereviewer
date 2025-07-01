@@ -28,6 +28,12 @@ runs:
     - name: Run Reviewer
       run: node ${{ github.action_path }}/lib/main.js
       shell: bash
+      env:
+        INPUT_GITHUB_TOKEN: ${{ inputs.GITHUB_TOKEN }}
+        INPUT_OPENAI_API_KEY: ${{ inputs.OPENAI_API_KEY }}
+        INPUT_OPENAI_API_MODEL: ${{ inputs.OPENAI_API_MODEL }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_CUSTOM_RULES_PATH: ${{ inputs.custom_rules_path }}
 branding:
   icon: "aperture"
   color: "green"
