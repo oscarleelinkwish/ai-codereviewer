@@ -21,7 +21,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - run: node ${{ github.action_path }}/lib/main.js
+    - name: Install Dependencies
+      run: npm install
+      shell: bash
+    - name: Run Reviewer
+      run: node ${{ github.action_path }}/lib/main.js
       shell: bash
 branding:
   icon: "aperture"
