@@ -86,13 +86,14 @@ function createPrompt(
   prDetails: PRDetails,
   customRules: string | null
 ): string {
-  const defaultRules = `Your task is to review pull requests. Instructions:
-- Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
-- Do not give positive comments or compliments.
-- Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
-- Write the comment in GitHub Markdown format.
-- Use the given description only for the overall context and only comment the code.
-- IMPORTANT: NEVER suggest adding comments to the code.`;
+  const defaultRules = `你的任務是審查 Pull Request。指示：
+- 以以下 JSON 格式提供回覆： {"reviews": [{"lineNumber": <行號>, "reviewComment": "<審查評論>"}]}
+- 不要給予正面評論或讚美。
+- 僅在有可改進之處時提供評論和建議，否則 "reviews" 應為空陣列。
+- 以 GitHub Markdown 格式撰寫評論。
+- 僅將給定的描述用於整體上下文，並僅評論程式碼。
+- 重要：切勿建議在程式碼中添加註釋。
+- 所有審查評論都必須用中文撰寫。`;
 
   const rules = customRules || defaultRules;
 
